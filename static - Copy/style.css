@@ -1,0 +1,138 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f7fb;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+h1 {
+    color: #2b6cb0;
+}
+
+.user-info {
+    font-size: 0.9rem;
+}
+
+.btn {
+    background-color: #38a169;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    margin-top: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+
+.btn.secondary {
+    background-color: #3182ce;
+}
+
+.btn.small {
+    padding: 4px 8px;
+    font-size: 0.8rem;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.search-form input[type="text"] {
+    margin-right: 8px;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 16px;
+    background-color: white;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+th {
+    background-color: #2b6cb0;
+    color: white;
+}
+
+.small-form {
+    margin-top: 6px;
+}
+
+.small-label {
+    font-size: 0.8rem;
+}
+
+.letter-box {
+    margin-top: 24px;
+    padding: 16px;
+    border: 1px solid #cbd5e0;
+    background-color: #edf2f7;
+}
+
+.letter-box pre {
+    white-space: pre-wrap;
+    font-family: inherit;
+}
+
+.message {
+    color: #dd6b20;
+    margin-top: 10px;
+}
+
+.error {
+    color: red;
+}
+
+.login-form {
+    max-width: 300px;
+}
+
+.login-form label {
+    display: block;
+    margin-bottom: 8px;
+}
+.formatted-text {
+    white-space: normal;
+    line-height: 1.5;
+    font-size: 16px;
+}
+
+.formatted-text b {
+    font-weight: bold;
+}
+
+.letter-box {
+    padding: 18px;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+.formatted-text {
+    white-space: pre-wrap;
+    font-size: 18px;
+    line-height: 1.6;
+}
+.letter-output {
+    white-space: pre-wrap;
+    font-family: Arial, sans-serif;
+    font-size: 17px;
+    line-height: 1.7;
+    background: #ffffff;
+    padding: 18px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    margin-top: 20px;
+}
+.letter-output b {
+    font-size: 18px;
+}

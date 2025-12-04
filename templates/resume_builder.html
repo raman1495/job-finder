@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Resume Builder</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<h2>🧠 AI Resume Builder</h2>
+
+<form action="{{ url_for('generate_resume') }}" method="post">
+    <label>Full Name:</label>
+    <input type="text" name="name" required>
+
+    <label>Email:</label>
+    <input type="email" name="email" required>
+
+    <label>Phone:</label>
+    <input type="text" name="phone" required>
+
+    <label>Location:</label>
+    <input type="text" name="location" required>
+
+    <label>Experience Summary:</label>
+    <textarea name="summary" required></textarea>
+
+    <label>Skills (comma separated):</label>
+    <textarea name="skills" required></textarea>
+
+    <label>Work Experience:</label>
+    <textarea name="experience" placeholder="Example: Job title, Company, Years, Achievements"></textarea>
+
+    <label>Education:</label>
+    <textarea name="education"></textarea>
+
+    <label>Certifications:</label>
+    <textarea name="certifications"></textarea>
+
+    <button type="submit" class="btn">Generate Resume</button>
+</form>
+{% if resume %}
+<form action="{{ url_for('download_text') }}" method="post">
+    <input type="hidden" name="text" value="{{ resume }}">
+    <button class="btn">⬇️ Download Resume as TXT</button>
+</form>
+{% endif %}
+
+</body>
+</html>

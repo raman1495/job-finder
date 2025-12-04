@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job AI Helper</title>
+
+    <!-- Bootstrap CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background:#f4f6f9; }
+        header { background:white; padding:15px 25px; border-bottom:1px solid #e5e5e5; }
+        h1 { font-size: 30px; font-weight: 700; }
+        .container-custom { max-width: 1100px; margin:auto; }
+        .btn { border-radius:8px; }
+        .job-table-container { background:white; padding:15px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.05) }
+        table { border-radius:10px; overflow:hidden; }
+        thead { background:#0066cc; color:white; }
+        footer { margin-top:40px; padding:15px; text-align:center; font-size:14px; color:#777; }
+        .letter-output { background:white; padding:18px; border-radius:10px; border:1px solid #ddd; white-space:pre-line; font-size:15px; }
+        .job-title { font-weight:600; color:#004c99; }
+        .table td { vertical-align: middle; }
+        .file-input { width: 180px; }
+    </style>
+</head>
+
+<body>
+
+<header class="d-flex justify-content-between align-items-center">
+    <h1>💼 Job AI Helper</h1>
+
+    <div>
+        {% if user %}
+            <span class="me-3">👤 <b>{{ user }}</b></span>
+            <a href="{{ url_for('view_saved') }}" class="btn btn-secondary btn-sm">⭐ Saved Jobs</a>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Logout</a>
+        {% else %}
+            <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">Login</a>
+        {% endif %}
+    </div>
+</header>
+
+<div class="container mt-4 container-custom">
+
+    <!-- AI Tools Section -->
+    <div class="job-table-container mb-4">
+        <h4 class="mb-3">🧠 AI Tools</h4>
+        <a href="{{ url_for('resume_builder') }}" class="btn btn-success mt-2">📄 AI Resume Builder</a>
+    </div>
+
+    <!-- Job Search -->
+    <h5 class="mb-3">🔎 Search Jobs</h5>
+    <form action="{{ url_for('scrape') }}" method="get" class="row g-3 mb-4 job-table-container">
+        <div class="col-md-4"><input class="form-control" type="text" name="keyword" placeholder="Keyword eg. Security Guard"></div>
+        <div class="col-md-3"><input class="form-control" type="text" name="city" placeholder="City"></div>
+        <div class="col-md-3"><input class="form-control" type="text" name="postal" placeholder="Postal Code"></div>
+        <div class="col-md-2"><button class="btn btn-primary w-100">🔍 Search</button></div>
+    </form>
+
+    {% if message %}
+    <p class="alert alert-warning">{{ message }}</p>
+    {% endif %}
+
+    {% if jobs %}
+    <div class="job-table-container">
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Company</th>
+                    <th>Location</th>
+                    <th style="width:380px">Actions</th>
+                </tr>
+            </thead>
+
+            <tbody>
+            {% for job in jobs %}
+            <tr>
+                <td class="job-title">{{ job.title }}</td>
+                <td>{{ job.company }}</td>
+                <td>{{ job.location }}</td>
+
+                <td>
+
+                    <!-- View Details Modal Button -->
+                    <button class="btn btn-outline-info btn-sm mb-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#jobModal"
+                        data-title="{{ job.title }}"
+                        data-company="{{ job.company }}"
+                        data-location="{{ job.location }}"
+                        data-description="{{ job.description|e }}">
+                        👁 View Details
+                    </button>
+
+                    <!-- Cover Letter -->
+                    <form action="{{ url_for('generate') }}" method="post" class="d-inline">
+                        <input type="hidden" name="title" value="{{ job.title }}">
+                        <input type="hidden" name="company" value="{{ job.company }}">
+                        <input type="hidden" name="location" value="{{ job.location }}">
+                        <button type="submit" class="btn btn-warning btn-sm mb-1">✉ Cover Letter</button>
+                    </form>
+
+                    <!-- Optimize Resume -->
+                    <form action="{{ url_for('optimize_resume') }}" method="post" enctype="multipart/form-data" class="d-inline">
+                        <input type="hidden" name="title" value="{{ job.title }}">
+                        <input type="hidden" name="company" value="{{ job.company }}">
+                        <input type="hidden" name="location" value="{{ job.location }}">
+                        <input type="file" name="resume" accept=".txt,.pdf,.docx" required class="form-control form-control-sm file-input mb-1">
+                        <button type="submit" class="btn btn-success btn-sm">⚡ Optimize</button>
+                    </form>
+
+                    <!-- Match Score (NEW) -->
+                    <form action="{{ url_for('match_score') }}" method="post" enctype="multipart/form-data" class="d-inline">
+                        <input type="hidden" name="title" value="{{ job.title }}">
+                        <input type="hidden" name="company" value="{{ job.company }}">
+                        <input type="hidden" name="location" value="{{ job.location }}">
+                        <input type="hidden" name="description" value="{{ job.description|e }}">
+                        <input type="file" name="resume" accept=".txt,.pdf,.docx" required class="form-control form-control-sm file-input mb-1">
+                        <button type="submit" class="btn btn-info btn-sm">📊 Match Score</button>
+                    </form>
+
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% else %}
+    <p class="text-muted">No jobs yet. Try searching.</p>
+    {% endif %}
+
+    <!-- Match Score Result -->
+    {% if match_result %}
+    <div class="alert alert-info mt-4">
+        <h4>📊 AI Job Match Score</h4>
+        <p class="mb-0">{{ match_result }}</p>
+    </div>
+    {% endif %}
+
+    <!-- AI Output -->
+    {% if letter %}
+    <h4 class="mt-4">📄 AI Generated Output</h4>
+    <div class="letter-output">{{ letter|safe }}</div>
+    <form action="{{ url_for('download_text') }}" method="post" class="mt-3">
+        <input type="hidden" name="text" value="{{ letter }}">
+        <button class="btn btn-dark">⬇️ Download</button>
+    </form>
+    {% endif %}
+
+</div>
+
+
+<!-- MODAL: Job Detail -->
+<div class="modal fade" id="jobModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <div>
+          <h4 class="modal-title fw-bold" id="jobModalTitle"></h4>
+          <div class="text-secondary">
+            <span id="jobModalCompany"></span> • <span id="jobModalLocation"></span>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+
+      <div class="modal-body">
+        <pre id="jobModalDescription" style="white-space: pre-wrap; font-size:15px; line-height:1.4;"></pre>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<footer>© 2025 Job AI Helper — Made with ❤️ using Flask + OpenAI</footer>
+
+
+<!-- Bootstrap JS + Modal Handler -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+const modal = document.getElementById('jobModal');
+
+modal.addEventListener('show.bs.modal', event => {
+    const button = event.relatedTarget;
+    document.getElementById('jobModalTitle').textContent = button.getAttribute('data-title');
+    document.getElementById('jobModalCompany').textContent = button.getAttribute('data-company');
+    document.getElementById('jobModalLocation').textContent = button.getAttribute('data-location');
+    document.getElementById('jobModalDescription').textContent =
+        button.getAttribute('data-description') || "No description provided.";
+});
+</script>
+
+</body>
+</html>

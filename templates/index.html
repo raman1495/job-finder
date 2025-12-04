@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job AI Helper</title>
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --primary: #0A66C2;   /* LinkedIn blue */
+            --light-bg: #f3f6fb;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--light-bg);
+        }
+
+        header {
+            background: #ffffff;
+            border-bottom: 1px solid #e1e4e8;
+            padding: 10px 0;
+        }
+
+        .app-title {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: #1d2226;
+        }
+
+        .app-title span {
+            color: var(--primary);
+        }
+
+        .user-badge {
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .user-badge b {
+            color: #111;
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .btn-primary:hover {
+            background-color: #004182;
+            border-color: #004182;
+        }
+
+        .btn-outline-primary {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .btn-outline-primary:hover {
+            background-color: var(--primary);
+            color: #fff;
+        }
+
+        .page-wrapper {
+            max-width: 1200px;
+            margin: 20px auto 40px auto;
+        }
+
+        .search-card,
+        .jobs-card,
+        .ai-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }
+
+        .search-card h5 {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .jobs-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .jobs-header h5 {
+            margin: 0;
+            font-weight: 600;
+        }
+
+        .job-title {
+            font-weight: 600;
+            color: #0A66C2;
+        }
+
+        .job-company {
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .job-location {
+            font-size: 0.9rem;
+            color: #777;
+        }
+
+        .table thead {
+            background: #eaf3ff;
+        }
+
+        .table thead th {
+            border-bottom-width: 0;
+            color: #0A66C2;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.02em;
+        }
+
+        .table tbody tr:hover {
+            background: #f5f8ff;
+        }
+
+        .file-input {
+            max-width: 210px;
+        }
+
+        .ai-card h5 {
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .letter-output {
+            background: #f9fafb;
+            border-radius: 8px;
+            border: 1px solid #e1e4e8;
+            padding: 12px 14px;
+            font-size: 0.95rem;
+            white-space: pre-line;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        footer {
+            text-align: center;
+            font-size: 0.85rem;
+            color: #777;
+            margin-bottom: 20px;
+        }
+
+        .badge-secondary {
+            background: #e1e4e8;
+            color: #444;
+        }
+
+        .match-chip {
+            display: inline-block;
+            background: #e6f0ff;
+            color: #004182;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 0.85rem;
+            margin-top: 6px;
+        }
+
+        /* Small helper text */
+        .helper-text {
+            font-size: 0.8rem;
+            color: #777;
+        }
+    </style>
+</head>
+
+<body>
+
+<!-- TOP NAVBAR -->
+<header>
+    <div class="container d-flex justify-content-between align-items-center">
+        <div class="d-flex align-items-center gap-2">
+            <div class="fs-4 text-primary">💼</div>
+            <div class="app-title">
+                Job <span>AI</span> Helper
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <a href="{{ url_for('resume_builder') }}" class="btn btn-success btn-sm">
+                📄 AI Resume Builder
+            </a>
+
+            {% if user %}
+                <span class="user-badge">
+                    👤 Logged in as <b>{{ user }}</b>
+                </span>
+                <a href="{{ url_for('view_saved') }}" class="btn btn-outline-primary btn-sm">⭐ Saved Jobs</a>
+                <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">Logout</a>
+            {% else %}
+                <a href="{{ url_for('login') }}" class="btn btn-primary btn-sm">Login</a>
+            {% endif %}
+        </div>
+    </div>
+</header>
+
+<div class="page-wrapper">
+
+    <div class="row g-4">
+        <!-- LEFT COLUMN: SEARCH + JOBS -->
+        <div class="col-lg-7">
+
+            <!-- SEARCH CARD -->
+            <div class="search-card">
+                <h5>🔍 Search Jobs</h5>
+                <p class="helper-text mb-2">
+                    Enter a role and location. We’ll fetch recent openings for you.
+                </p>
+
+                <form action="{{ url_for('scrape') }}" method="get" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label mb-1">Keyword</label>
+                        <input class="form-control" type="text" name="keyword" placeholder="e.g. Security Guard">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label mb-1">City</label>
+                        <input class="form-control" type="text" name="city" placeholder="e.g. Toronto">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label mb-1">Postal Code</label>
+                        <input class="form-control" type="text" name="postal" placeholder="Optional">
+                    </div>
+
+                    <div class="col-12 mt-2">
+                        <button class="btn btn-primary">
+                            🔍 Search Jobs
+                        </button>
+                    </div>
+                </form>
+
+                {% if message %}
+                    <div class="alert alert-warning mt-2 mb-0">
+                        {{ message }}
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- JOBS LIST -->
+            <div class="jobs-card">
+                <div class="jobs-header">
+                    <h5>📄 Job Results</h5>
+                    {% if jobs %}
+                        <span class="badge bg-secondary">
+                            {{ jobs|length }} found
+                        </span>
+                    {% endif %}
+                </div>
+
+                {% if jobs %}
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Job</th>
+                                    <th>Company</th>
+                                    <th>Location</th>
+                                    <th style="width: 320px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            {% for job in jobs %}
+                                <tr>
+                                    <td>
+                                        <div class="job-title">{{ job.title }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="job-company">{{ job.company }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="job-location">{{ job.location }}</div>
+                                    </td>
+                                    <td>
+
+                                        <!-- View Details (modal) -->
+                                        <button
+                                            class="btn btn-outline-info btn-sm mb-1"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#jobModal"
+                                            data-title="{{ job.title }}"
+                                            data-company="{{ job.company }}"
+                                            data-location="{{ job.location }}"
+                                            data-description="{{ job.description|e }}">
+                                            👁 View Details
+                                        </button>
+
+                                        <!-- Cover Letter -->
+                                        <form action="{{ url_for('generate') }}" method="post" class="d-inline">
+                                            <input type="hidden" name="title" value="{{ job.title }}">
+                                            <input type="hidden" name="company" value="{{ job.company }}">
+                                            <input type="hidden" name="location" value="{{ job.location }}">
+                                            <button type="submit" class="btn btn-warning btn-sm mb-1">
+                                                ✉ Cover Letter
+                                            </button>
+                                        </form>
+
+                                        <!-- Optimize Resume -->
+                                        <form action="{{ url_for('optimize_resume') }}"
+                                              method="post"
+                                              enctype="multipart/form-data"
+                                              class="d-inline">
+                                            <input type="hidden" name="title" value="{{ job.title }}">
+                                            <input type="hidden" name="company" value="{{ job.company }}">
+                                            <input type="hidden" name="location" value="{{ job.location }}">
+                                            <input type="file"
+                                                   name="resume"
+                                                   accept=".txt,.pdf,.docx"
+                                                   required
+                                                   class="form-control form-control-sm file-input d-inline-block mb-1">
+                                            <button type="submit" class="btn btn-success btn-sm mb-1">
+                                                ⚡ Optimize
+                                            </button>
+                                        </form>
+
+                                        <!-- Match Score -->
+                                        <form action="{{ url_for('match_score') }}"
+                                              method="post"
+                                              enctype="multipart/form-data"
+                                              class="d-inline">
+                                            <input type="hidden" name="title" value="{{ job.title }}">
+                                            <input type="hidden" name="company" value="{{ job.company }}">
+                                            <input type="hidden" name="location" value="{{ job.location }}">
+                                            <input type="hidden" name="description" value="{{ job.description }}">
+                                            <input type="file"
+                                                   name="resume"
+                                                   accept=".txt,.pdf,.docx"
+                                                   required
+                                                   class="form-control form-control-sm file-input d-inline-block mb-1">
+                                            <button type="submit" class="btn btn-info btn-sm mb-1">
+                                                📊 Match Score
+                                            </button>
+                                        </form>
+
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <p class="text-muted mb-0">No jobs loaded yet. Try a search above.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: AI OUTPUT -->
+        <div class="col-lg-5">
+            <div class="ai-card">
+                <h5>🤖 AI Assistant Panel</h5>
+                <p class="helper-text">
+                    This area shows generated cover letters, optimized resumes, and match scores.
+                </p>
+
+                {% if match_result %}
+                    <div class="mb-3">
+                        <div class="fw-semibold mb-1">📊 ATS Match Score</div>
+                        <div class="match-chip">
+                            {{ match_result }}
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if letter %}
+                    <div class="mb-2">
+                        <div class="fw-semibold mb-1">📄 AI Generated Text</div>
+                        <div class="letter-output">
+                            {{ letter|safe }}
+                        </div>
+                    </div>
+
+                    <form action="{{ url_for('download_text') }}" method="post" class="mt-2">
+                        <input type="hidden" name="text" value="{{ letter }}">
+                        <button class="btn btn-dark btn-sm">
+                            ⬇️ Download as .txt
+                        </button>
+                    </form>
+                {% else %}
+                    <p class="text-muted mb-0">
+                        Generate a cover letter or optimize a resume from the left side to see AI output here.
+                    </p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JOB DETAIL MODAL -->
+<div class="modal fade" id="jobModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title fw-bold" id="jobModalTitle"></h5>
+          <div class="text-secondary small">
+            <span id="jobModalCompany"></span> • <span id="jobModalLocation"></span>
+          </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+
+      <div class="modal-body">
+        <pre id="jobModalDescription" style="white-space: pre-wrap; font-size:0.95rem;"></pre>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<footer>
+    © 2025 Job AI Helper — Built with Flask & OpenAI
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<script>
+    const modalEl = document.getElementById('jobModal');
+    if (modalEl) {
+        modalEl.addEventListener('show.bs.modal', event => {
+            const button = event.relatedTarget;
+            if (!button) return;
+
+            document.getElementById('jobModalTitle').textContent =
+                button.getAttribute('data-title') || "";
+            document.getElementById('jobModalCompany').textContent =
+                button.getAttribute('data-company') || "";
+            document.getElementById('jobModalLocation').textContent =
+                button.getAttribute('data-location') || "";
+            document.getElementById('jobModalDescription').textContent =
+                button.getAttribute('data-description') || "No description provided.";
+        });
+    }
+</script>
+
+</body>
+</html>
