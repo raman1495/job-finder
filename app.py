@@ -17,10 +17,18 @@ import tempfile
 import re
 
 app = Flask(__name__)
-init_db()
-app.secret_key = "CHANGE_THIS_SECRET_KEY"   
+app.secret_key = "CHANGE_THIS_SECRET_KEY"
 
-saved_jobs = {}   # {"username": [ {title, company, location}, ... ]}
+saved_jobs = {}   # {"username": [...jobs...] }
+
+# ------------------- OPENAI INITIALIZATION -------------------
+
+OPENAI_KEY = os.getenv("OPENAI_API_KEY")
+
+if not OPENAI_KEY:
+    raise RuntimeError("❌ OPENAI_API_KEY not loaded! Add it in Render → Environment.")
+
+client = OpenAI(api_key=OPENAI_KEY)
 
 
 # ---------- HOME / JOB SEARCH ----------
@@ -50,7 +58,7 @@ def scrape():
     jobs = scrape_jobs(keyword=keyword, city=city)
     save_jobs(jobs)
 
-    message = None if jobs else f"⚠️ No jobs found for '{keyword}' in '{location}'. Try another search."
+    message = None if jobs else f"No jobs found for '{keyword}' in '{location}'."
 
     return render_template(
         "index.html",
@@ -78,7 +86,6 @@ def generate():
     location = request.form["location"]
 
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         prompt = (
             f"Write a short professional job application letter for a {job_title} "
             f"position at {company} in {location}. Make it sound confident and polished."
@@ -88,8 +95,10 @@ def generate():
             model="gpt-4o-mini",
             messages=[{"role": "user", "content": prompt}],
         )
+
         raw_text = resp.choices[0].message.content
         letter = clean_output(raw_text)
+
         return render_template(
             "index.html",
             jobs=get_all_jobs(),
@@ -103,7 +112,7 @@ def generate():
         return render_template(
             "index.html",
             jobs=get_all_jobs(),
-            letter=f"Error generating letter: {e}",
+            letter=f"⚠️ Error generating letter: {e}",
             message=None,
             match_result=None,
             user=session.get("user"),
@@ -122,7 +131,7 @@ def optimize_resume():
         return render_template(
             "index.html",
             jobs=get_all_jobs(),
-            letter="⚠️ Please upload a resume file.",
+            letter="⚠️ Please upload a resume.",
             user=session.get("user"),
         )
 
@@ -131,32 +140,35 @@ def optimize_resume():
     file.save(temp_path)
 
     try:
-        # Extract text
         text = ""
+
+        # ---- Extract text depending on format ----
         if filename.lower().endswith(".txt"):
             with open(temp_path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
+
         elif filename.lower().endswith(".pdf"):
             import PyPDF2
             reader = PyPDF2.PdfReader(temp_path)
             text = "\n".join(page.extract_text() or "" for page in reader.pages)
+
         elif filename.lower().endswith(".docx"):
             import docx
             doc = docx.Document(temp_path)
             text = "\n".join(p.text for p in doc.paragraphs)
+
         else:
             return render_template(
                 "index.html",
                 jobs=get_all_jobs(),
-                letter="⚠️ Unsupported file format (use .txt, .pdf, or .docx).",
+                letter="⚠️ Unsupported format. Use .txt, .pdf, or .docx.",
                 user=session.get("user"),
             )
 
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        # ---- AI Resume Optimization ----
         prompt = (
             f"Optimize this resume for a job as '{job_title}' at '{company}' in '{location}'. "
-            "Improve clarity, add strong bullet points, and include relevant keywords.\n\n"
-            f"Resume:\n{text}"
+            f"Improve clarity and add strong bullet points.\n\nResume:\n{text}"
         )
 
         resp = client.chat.completions.create(
@@ -170,7 +182,7 @@ def optimize_resume():
             "index.html",
             jobs=get_all_jobs(),
             letter=optimized,
-            message="✅ Resume optimized.",
+            message="Resume optimized successfully.",
             match_result=None,
             user=session.get("user"),
         )
@@ -179,54 +191,48 @@ def optimize_resume():
         return render_template(
             "index.html",
             jobs=get_all_jobs(),
-            letter=f"Error optimizing resume: {e}",
+            letter=f"⚠️ Error optimizing resume: {e}",
             user=session.get("user"),
         )
 
     finally:
         try:
             os.remove(temp_path)
-        except Exception:
+        except:
             pass
 
-# ---------- NEW: RESUME vs JOB MATCH SCORE (Embeddings-based) ----------
+
+# ---------- MATCH SCORE ----------
 @app.route("/match_score", methods=["POST"])
 def match_score():
     resume_file = request.files.get("resume")
-    job_title = request.form.get("title", "").strip()
-    company = request.form.get("company", "").strip()
-    location = request.form.get("location", "").strip()
-    job_desc = request.form.get("description", "").strip()
+    job_title = request.form.get("title", "")
+    company = request.form.get("company", "")
+    location = request.form.get("location", "")
+    job_desc = request.form.get("description", "")
 
-    # Validate Input
-    if not resume_file or not job_desc:
+    if not resume_file:
         return render_template(
             "index.html",
             jobs=get_all_jobs(),
-            letter=None,
-            message="⚠️ Please upload a resume AND include a job description.",
-            match_result=None,
+            message="⚠️ Upload a resume.",
             user=session.get("user"),
         )
 
-    # Read resume file
     try:
         resume_text = resume_file.read().decode("utf-8", errors="ignore")
     except:
         resume_text = ""
 
-    # Handle empty resume
     if resume_text.strip() == "":
         return render_template(
             "index.html",
             jobs=get_all_jobs(),
-            message="⚠️ Could not read the resume file.",
-            match_result=None,
+            message="⚠️ Could not read resume file.",
             user=session.get("user"),
         )
 
-    # AI Request
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    # ---- AI Comparison ----
     prompt = f"""
 Compare this resume to the job description and give a match score (0-100%).
 
@@ -253,23 +259,21 @@ Resume:
 
     except Exception as e:
         if "insufficient_quota" in str(e):
-            match_result = "⚠️ OpenAI API limit reached — add billing or use cheaper model"
+            match_result = "⚠️ OpenAI quota reached."
         else:
-            match_result = f"⚠️ Error computing match score: {e}"
+            match_result = f"⚠️ Error: {e}"
 
     return render_template(
         "index.html",
         jobs=get_all_jobs(),
+        match_result=match_result,
         letter=None,
         message=None,
-        match_result=match_result,
         user=session.get("user"),
     )
 
 
-    
-
-# ---------- DOWNLOAD AS TEXT ----------
+# ---------- DOWNLOAD ----------
 @app.route("/download", methods=["POST"])
 def download_text():
     text = request.form.get("text", "")
@@ -296,24 +300,17 @@ def generate_resume():
     job_goal = request.form.get("job_goal")
 
     try:
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         prompt = f"""
-Generate a full professional resume based on this information.
-Format cleanly with bullet points, resume headings, and clear layout.
+Generate a clean, professional resume.
 
 Name: {name}
 Email: {email}
 Phone: {phone}
-
 Career Objective: {job_goal}
+Experience: {experience}
+Skills: {skills}
 
-Experience:
-{experience}
-
-Skills:
-{skills}
-
-Do NOT use markdown. Output in formatted plain text.
+Do NOT use markdown. Use clean plain text formatting.
 """
 
         resp = client.chat.completions.create(
@@ -340,13 +337,12 @@ Do NOT use markdown. Output in formatted plain text.
 # ---------- LOGIN ----------
 DEMO_USER = {"username": "student", "password": "1234"}
 
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        if (
-            request.form.get("username") == DEMO_USER["username"]
-            and request.form.get("password") == DEMO_USER["password"]
-        ):
+        if request.form.get("username") == DEMO_USER["username"] and \
+           request.form.get("password") == DEMO_USER["password"]:
             session["user"] = DEMO_USER["username"]
             return redirect(url_for("index"))
 
@@ -361,20 +357,18 @@ def logout():
     return redirect(url_for("index"))
 
 
-# ---------- SAVE JOBS ----------
+# ---------- SAVED JOBS ----------
 @app.route("/save_job", methods=["POST"])
 def save_job():
     user = session.get("user")
     if not user:
         return redirect(url_for("login"))
 
-    saved_jobs.setdefault(user, []).append(
-        {
-            "title": request.form["title"],
-            "company": request.form["company"],
-            "location": request.form["location"],
-        }
-    )
+    saved_jobs.setdefault(user, []).append({
+        "title": request.form["title"],
+        "company": request.form["company"],
+        "location": request.form["location"],
+    })
 
     return redirect(url_for("index"))
 
@@ -385,18 +379,16 @@ def view_saved():
     if not user:
         return redirect(url_for("login"))
 
-    return render_template(
-        "saved.html", jobs=saved_jobs.get(user, []), user=user
-    )
+    return render_template("saved.html", jobs=saved_jobs.get(user, []), user=user)
 
 
-# ---------- HEALTH CHECK ----------
+# ---------- HEALTH ----------
 @app.route("/health")
 def health():
     return "ok"
 
 
-# ---------- RUN APP ----------
+# ---------- RUN ----------
 if __name__ == "__main__":
     init_db()
     app.run(host="127.0.0.1", port=5000, debug=True)
